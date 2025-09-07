@@ -1,0 +1,38 @@
+{
+  "name": "wasm-game-engine",
+  "version": "1.0.0",
+  "description": "High-performance WebAssembly game engine",
+  "main": "index.js",
+  "scripts": {
+    "build": "wasm-pack build --target web --out-dir pkg",
+    "dev": "python -m http.server 8000",
+    "dev-node": "npx http-server -p 8000 -c-1",
+    "test": "wasm-pack test --headless --firefox",
+    "clean": "rm -rf pkg/ target/"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1",
+    "typescript": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/wasm-game-engine.git"
+  },
+  "keywords": [
+    "webassembly",
+    "wasm",
+    "game-engine",
+    "rust",
+    "webgl",
+    "2d-graphics",
+    "physics",
+    "browser-games"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "files": [
+    "pkg/",
+    "examples/",
+    "docs/"
+  ]
+}

@@ -1,0 +1,57 @@
+[package]
+name = "wasm-game-engine"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance WebAssembly game engine"
+license = "MIT"
+repository = "https://github.com/yourusername/wasm-game-engine"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+js-sys = "0.3"
+wee_alloc = "0.4"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+  "console",
+  "Document",
+  "Element",
+  "HtmlCanvasElement",
+  "WebGl2RenderingContext",
+  "WebGlProgram",
+  "WebGlShader",
+  "WebGlBuffer",
+  "WebGlVertexArrayObject",
+  "WebGlTexture",
+  "WebGlUniformLocation",
+  "EventTarget",
+  "Event",
+  "KeyboardEvent",
+  "MouseEvent",
+  "TouchEvent",
+  "TouchList",
+  "Touch",
+  "AudioContext",
+  "AudioBuffer",
+  "AudioBufferSourceNode",
+  "GainNode",
+  "Window",
+  "Performance",
+  "DomRect",
+  "ImageData",
+  "CanvasRenderingContext2d",
+  "HtmlImageElement",
+]
+
+[dependencies.wasm-bindgen-futures]
+version = "0.4"
+
+[profile.release]
+opt-level = 3
+lto = true
+debug = false
+panic = "abort"

@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Shooter - WebAssembly Game Engine</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: radial-gradient(ellipse at center, #1e3c72 0%, #0f0f0f 70%);
+            font-family: 'Courier New', monospace;
+            color: white;
+            overflow: hidden;
+        }
+        
+        .game-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        
+        #gameCanvas {
+            border: 2px solid #00ffff;
+            border-radius: 5px;
+            box-shadow: 0 0 20px #00ffff, inset 0 0 20px rgba(0, 255, 255, 0.1);
+        }
+        
+        .ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            z-index: 10;
+        }
+        
+        .score {
+            font-size: 24px;
+            color: #00ff00;
+            text-shadow: 0 0 10px #00ff00;
+            margin-bottom: 10px;
+        }
+        
+        .health {
+            font-size: 18px;
+            color: #ff3333;
+            text-shadow: 0 0 10px #ff3333;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            font-size: 14px;
+            opacity: 0.7;
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 40px;
+            border-radius: 10px;
+            border: 2px solid #ff3333;
+            display: none;
+        }
+        
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            font-size: 20px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ffff, #0099cc);
+            border: none;
+            padding: 12px 24px;
+            color: black;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="800" height="600"></canvas>
+        
+        <div class="ui">
+            <div class="score" id="score">SCORE: 0</div>
+            <div class="health" id="health">HEALTH: ███████████</div>
+        </div>
+        
+        <div class="instructions">
+            <p><strong>WASD:</strong> Move Ship | <strong>SPACE:</strong> Shoot | <strong>ESC:</strong> Pause</p>
+        </div>
+        
+        <div class="game-over" id="gameOver">
+            <h2>GAME OVER</h2>
+            <p id="finalScore">Final Score: 0</p>
+            <button onclick="restartGame()">RESTART</button>
+        </div>
+    </div>
+    
+    <div class="loading" id="loading">
+        <p>🚀 LOADING SPACE COMBAT SYSTEMS...</p>
+        <p><small>Initializing WebAssembly Engine...</small></p>
+    </div>
+
+    <script type="module">
+        import { GameEngine } from '../js/game-engine.js';
+        
+        let engine;
+        let gameState = {
+            player: null,
+            bullets: [],
+            enemies: [],
+            score: 0,
+            health: 100,
+            isPlaying: false,
+            lastEnemySpawn: 0,
+            lastShot: 0
+        };
+        
+        const GAME_CONFIG = {
+            playerSpeed: 300,
+            bulletSpeed: 500,
+            enemySpeed: 150,
+            enemySpawnRate: 2000, // ms
+            shootCooldown: 200 // ms
+        };
+        
+        async function init() {
+            try {
+                engine = new GameEngine('gameCanvas');
+                const success = await engine.init();
+                
+                if (success) {
+                    engine.start();
+                    document.getElementById('loading').style.display = 'none';
+                    startGame();
+                } else {
+                    throw new Error('Failed to initialize engine');
+                }
+            } catch (error) {
+                console.error('Initialization error:', error);
+                document.getElementById('loading').innerHTML = `
+                    <p>❌ SYSTEM ERROR</p>
+                    <p>${error.message}</p>
+                `;
+            }
+        }
+        
+        function startGame() {
+            gameState.isPlaying = true;
+            gameState.score = 0;
+            gameState.health = 100;
+            
+            // Create player ship
+            const canvas = engine.getCanvasSize();
+            gameState.player = engine.createSprite({
+                x: canvas.width / 2 - 15,
+                y: canvas.height - 80,
+                width: 30,
+                height: 40,
+                color: { r: 0.0, g: 1.0, b: 1.0, a: 1.0 } // Cyan
+            });
+            
+            updateUI();
+            gameLoop();
+        }
+        
+        function gameLoop() {
+            if (!gameState.isPlaying) return;
+            
+            const currentTime = performance.now();
+            const deltaTime = 16; // Approximate 60fps
+            
+            handleInput();
+            updateGameObjects(currentTime);
+            checkCollisions();
+            spawnEnemies(currentTime);
+            cleanupObjects();
+            updateUI();
+            
+            setTimeout(() => requestAnimationFrame(gameLoop), 16);
+        }
+        
+        function handleInput() {
+            const player = gameState.player;
+            if (!player) return;
+            
+            const canvas = engine.getCanvasSize();
+            const speed = GAME_CONFIG.playerSpeed / 60; // Per frame
+            let newX = player.x;
+            let newY = player.y;
+            
+            // Movement
+            if (engine.isKeyPressed(GameEngine.Keys.A) || engine.isKeyPressed(GameEngine.Keys.ARROW_LEFT)) {
+                newX = Math.max(0, player.x - speed);
+            }
+            if (engine.isKeyPressed(GameEngine.Keys.D) || engine.isKeyPressed(GameEngine.Keys.ARROW_RIGHT)) {
+                newX = Math.min(canvas.width - player.width, player.x + speed);
+            }
+            if (engine.isKeyPressed(GameEngine.Keys.W) || engine.isKeyPressed(GameEngine.Keys.ARROW_UP)) {
+                newY = Math.max(0, player.y - speed);
+            }
+            if (engine.isKeyPressed(GameEngine.Keys.S) || engine.isKeyPressed(GameEngine.Keys.ARROW_DOWN)) {
+                newY = Math.min(canvas.height - player.height, player.y + speed);
+            }
+            
+            engine.moveSprite(player.id, newX, newY);
+            player.x = newX;
+            player.y = newY;
+            
+            // Shooting
+            if (engine.isKeyPressed(GameEngine.Keys.SPACE)) {
+                shoot();
+            }
+        }
+        
+        function shoot() {
+            const currentTime = performance.now();
+            if (currentTime - gameState.lastShot < GAME_CONFIG.shootCooldown) return;
+            
+            const player = gameState.player;
+            const bullet = engine.createSprite({
+                x: player.x + player.width / 2 - 2,
+                y: player.y,
+                width: 4,
+                height: 12,
+                color: { r: 1.0, g: 1.0, b: 0.0, a: 1.0 } // Yellow
+            });
+            
+            gameState.bullets.push({
+                sprite: bullet,
+                speed: GAME_CONFIG.bulletSpeed / 60
+            });
+            
+            gameState.lastShot = currentTime;
+        }
+        
+        function updateGameObjects(currentTime) {
+            // Update bullets
+            gameState.bullets.forEach(bullet => {
+                bullet.sprite.y -= bullet.speed;
+                engine.moveSprite(bullet.sprite.id, bullet.sprite.x, bullet.sprite.y);
+            });
+            
+            // Update enemies
+            gameState.enemies.forEach(enemy => {
+                enemy.sprite.y += enemy.speed;
+                engine.moveSprite(enemy.sprite.id, enemy.sprite.x, enemy.sprite.y);
+            });
+        }
+        
+        function spawnEnemies(currentTime) {
+            if (currentTime - gameState.lastEnemySpawn < GAME_CONFIG.enemySpawnRate) return;
+            
+            const canvas = engine.getCanvasSize();
+            const enemy = engine.createSprite({
+                x: Math.random() * (canvas.width - 40),
+                y: -40,
+                width: 40,
+                height: 30,
+                color: { r: 1.0, g: 0.2, b: 0.2, a: 1.0 } // Red
+            });
+            
+            gameState.enemies.push({
+                sprite: enemy,
+                speed: GAME_CONFIG.enemySpeed / 60 + Math.random() * 2
+            });
+            
+            gameState.lastEnemySpawn = currentTime;
+        }
+        
+        function checkCollisions() {
+            const canvas = engine.getCanvasSize();
+            
+            // Bullet vs Enemy collisions
+            for (let i = gameState.bullets.length - 1; i >= 0; i--) {
+                const bullet = gameState.bullets[i];
+                
+                for (let j = gameState.enemies.length - 1; j >= 0; j--) {
+                    const enemy = gameState.enemies[j];
+                    
+                    if (isColliding(bullet.sprite, enemy.sprite)) {
+                        // Remove bullet and enemy
+                        gameState.bullets.splice(i, 1);
+                        gameState.enemies.splice(j, 1);
+                        
+                        gameState.score += 10;
+                        break;
+                    }
+                }
+            }
+            
+            // Enemy vs Player collisions
+            for (let i = gameState.enemies.length - 1; i >= 0; i--) {
+                const enemy = gameState.enemies[i];
+                
+                if (isColliding(enemy.sprite, gameState.player)) {
+                    gameState.enemies.splice(i, 1);
+                    gameState.health -= 20;
+                    
+                    if (gameState.health <= 0) {
+                        gameOver();
+                        return;
+                    }
+                }
+            }
+        }
+        
+        function isColliding(obj1, obj2) {
+            return obj1.x < obj2.x + obj2.width &&
+                   obj1.x + obj1.width > obj2.x &&
+                   obj1.y < obj2.y + obj2.height &&
+                   obj1.y + obj1.height > obj2.y;
+        }
+        
+        function cleanupObjects() {
+            const canvas = engine.getCanvasSize();
+            
+            // Remove bullets that went off screen
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                if (bullet.sprite.y < -bullet.sprite.height) {
+                    return false;
+                }
+                return true;
+            });
+            
+            // Remove enemies that went off screen
+            gameState.enemies = gameState.enemies.filter(enemy => {
+                if (enemy.sprite.y > canvas.height) {
+                    gameState.health -= 5; // Lose health for missed enemies
+                    return false;
+                }
+                return true;
+            });
+            
+            // Check if health depleted
+            if (gameState.health <= 0) {
+                gameOver();
+            }
+        }
+        
+        function updateUI() {
+            document.getElementById('score').textContent = `SCORE: ${gameState.score}`;
+            
+            const healthBars = Math.max(0, Math.ceil(gameState.health / 10));
+            const healthDisplay = '█'.repeat(healthBars) + '░'.repeat(10 - healthBars);
+            document.getElementById('health').textContent = `HEALTH: ${healthDisplay}`;
+        }
+        
+        function gameOver() {
+            gameState.isPlaying = false;
+            document.getElementById('finalScore').textContent = `Final Score: ${gameState.score}`;
+            document.getElementById('gameOver').style.display = 'block';
+        }
+        
+        window.restartGame = function() {
+            document.getElementById('gameOver').style.display = 'none';
+            
+            // Clear all game objects
+            gameState.bullets = [];
+            gameState.enemies = [];
+            
+            // Restart
+            setTimeout(() => {
+                location.reload(); // Simple restart - in real implementation we'd properly reset
+            }, 100);
+        };
+        
+        // Initialize the game
+        init();
+    </script>
+</body>
+</html>
