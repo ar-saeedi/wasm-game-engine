@@ -4,7 +4,8 @@
   "description": "High-performance WebAssembly game engine",
   "main": "index.js",
   "scripts": {
-    "build": "wasm-pack build --target web --out-dir pkg",
+    "build": "echo 'Using JavaScript fallback - no WASM build needed'",
+    "build-wasm": "wasm-pack build --target web --out-dir pkg",
     "dev": "python -m http.server 8000",
     "dev-node": "npx http-server -p 8000 -c-1",
     "test": "wasm-pack test --headless --firefox",

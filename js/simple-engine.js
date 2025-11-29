@@ -245,6 +245,14 @@ class SimpleGameEngine {
         return this.sprites.get(spriteId);
     }
     
+    removeSprite(spriteId) {
+        return this.sprites.delete(spriteId);
+    }
+    
+    clearAllSprites() {
+        this.sprites.clear();
+    }
+    
     setupEventListeners() {
         // Keyboard events
         window.addEventListener('keydown', (e) => {

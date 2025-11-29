@@ -160,6 +160,28 @@ class GameEngine {
         }
     }
     
+    removeSprite(spriteId) {
+        if (this.useWasm) {
+            const sprite = this.sprites.get(spriteId);
+            if (sprite) {
+                // Note: WASM engine would need its own removal - for now just remove from JS
+                this.sprites.delete(spriteId);
+                return true;
+            }
+            return false;
+        } else {
+            return this.fallbackEngine.removeSprite(spriteId);
+        }
+    }
+    
+    clearAllSprites() {
+        if (this.useWasm) {
+            this.sprites.clear();
+        } else {
+            this.fallbackEngine.clearAllSprites();
+        }
+    }
+    
     // Input handling
     setupEventListeners() {
         // Keyboard events
