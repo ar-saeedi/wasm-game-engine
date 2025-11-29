@@ -3,354 +3,1392 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WebAssembly Game Engine - Basic Demo</title>
+    <title>Engine Playground - WASM Game Engine</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        :root {
+            --bg-dark: #0a0a0f;
+            --bg-panel: #12121a;
+            --bg-card: #1a1a25;
+            --bg-hover: #252535;
+            --accent-cyan: #00f0ff;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-orange: #f97316;
+            --accent-green: #22c55e;
+            --text-primary: #ffffff;
+            --text-secondary: #9ca3af;
+            --border: rgba(255,255,255,0.08);
+        }
+        
         body {
-            margin: 0;
-            padding: 20px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            color: white;
-            min-height: 100vh;
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-primary);
+            height: 100vh;
+            overflow: hidden;
         }
         
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
+        /* Layout */
+        .app { display: flex; height: 100vh; }
         
-        h1 {
-            text-align: center;
-            margin-bottom: 10px;
-            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
-        }
-        
-        .subtitle {
-            text-align: center;
-            opacity: 0.8;
-            margin-bottom: 30px;
-        }
-        
-        .canvas-container {
+        /* Sidebar */
+        .sidebar {
+            width: 280px;
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border);
             display: flex;
+            flex-direction: column;
+            flex-shrink: 0;
+        }
+        
+        .sidebar-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+        
+        .logo-icon {
+            width: 36px; height: 36px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
             justify-content: center;
-            margin-bottom: 30px;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.85rem;
+            margin-top: 12px;
+            transition: color 0.2s;
+        }
+        .back-link:hover { color: var(--accent-cyan); }
+        
+        /* Demo Tabs */
+        .demo-tabs {
+            padding: 16px;
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .demo-tabs h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .tab-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px 16px;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 10px;
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 6px;
+            text-align: left;
+        }
+        
+        .tab-btn:hover { background: var(--bg-card); color: var(--text-primary); }
+        .tab-btn.active { 
+            background: rgba(0, 240, 255, 0.1); 
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+        }
+        
+        .tab-icon {
+            width: 32px; height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+        .tab-icon.particles { background: rgba(249, 115, 22, 0.2); }
+        .tab-icon.physics { background: rgba(168, 85, 247, 0.2); }
+        .tab-icon.collision { background: rgba(236, 72, 153, 0.2); }
+        .tab-icon.benchmark { background: rgba(34, 197, 94, 0.2); }
+        
+        /* Main Area */
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+        
+        /* Header */
+        .header {
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .demo-title { font-size: 1.25rem; font-weight: 700; }
+        .demo-desc { color: var(--text-secondary); font-size: 0.9rem; margin-top: 4px; }
+        
+        .stats {
+            display: flex;
+            gap: 24px;
+        }
+        
+        .stat {
+            text-align: right;
+        }
+        
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .stat-value.fps { color: var(--accent-green); }
+        .stat-value.objects { color: var(--accent-cyan); }
+        
+        .stat-label {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+        
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            display: flex;
+            padding: 24px;
+            gap: 24px;
+            min-height: 0;
+        }
+        
+        .canvas-wrapper {
+            flex: 1;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
         }
         
         #gameCanvas {
-            border: 3px solid rgba(255,255,255,0.2);
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-            background: #1a1a1a;
+            width: 100%;
+            height: 100%;
+            display: block;
         }
         
-        .controls {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 20px;
-            margin-bottom: 30px;
+        .canvas-overlay {
+            position: absolute;
+            top: 16px;
+            left: 16px;
+            display: flex;
+            gap: 8px;
         }
         
-        .control-group {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
-            border-radius: 10px;
+        .overlay-badge {
+            padding: 6px 12px;
+            background: rgba(0,0,0,0.6);
             backdrop-filter: blur(10px);
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+        .overlay-badge.wasm { color: var(--accent-orange); }
+        .overlay-badge.js { color: var(--accent-cyan); }
+        
+        /* Controls Panel */
+        .controls-panel {
+            width: 300px;
+            background: var(--bg-panel);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 20px;
+            overflow-y: auto;
+            flex-shrink: 0;
         }
         
-        .control-group h3 {
-            margin-top: 0;
-            color: #f0f0f0;
+        .control-section {
+            margin-bottom: 24px;
         }
         
-        button {
-            background: linear-gradient(45deg, #ff6b6b, #ee5a24);
-            border: none;
-            padding: 10px 20px;
-            margin: 5px;
-            border-radius: 25px;
-            color: white;
+        .control-section h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .control-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .control-label {
+            font-size: 0.9rem;
+            color: var(--text-primary);
+        }
+        
+        .control-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+            min-width: 50px;
+            text-align: right;
+        }
+        
+        /* Sliders */
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            background: var(--bg-card);
+            border-radius: 3px;
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 18px;
+            height: 18px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
             cursor: pointer;
-            font-weight: bold;
-            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
         }
         
-        button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(238, 90, 36, 0.4);
+        /* Buttons */
+        .btn {
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: none;
         }
         
-        button:active {
-            transform: translateY(0);
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: #000;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(0, 240, 255, 0.3); }
+        
+        .btn-secondary {
+            background: var(--bg-card);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--bg-hover); border-color: var(--accent-cyan); }
+        
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.2);
+            color: #ef4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
+        
+        .btn-group {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
         }
         
-        .info {
-            background: rgba(255,255,255,0.1);
-            padding: 20px;
+        .btn-group .btn { flex: 1; min-width: 80px; }
+        
+        /* Presets */
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+        }
+        
+        .preset-btn {
+            padding: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
             border-radius: 10px;
-            backdrop-filter: blur(10px);
-        }
-        
-        .loading {
+            cursor: pointer;
+            transition: all 0.2s;
             text-align: center;
-            padding: 40px;
-            font-size: 1.2em;
         }
         
-        .status {
+        .preset-btn:hover { border-color: var(--accent-cyan); background: var(--bg-hover); }
+        .preset-btn.active { border-color: var(--accent-cyan); background: rgba(0, 240, 255, 0.1); }
+        
+        .preset-icon { font-size: 1.5rem; margin-bottom: 6px; }
+        .preset-name { font-size: 0.8rem; color: var(--text-primary); }
+        
+        /* Color Picker */
+        .color-grid {
+            display: grid;
+            grid-template-columns: repeat(6, 1fr);
+            gap: 6px;
+        }
+        
+        .color-btn {
+            aspect-ratio: 1;
+            border-radius: 6px;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .color-btn:hover { transform: scale(1.1); }
+        .color-btn.active { border-color: #fff; box-shadow: 0 0 10px currentColor; }
+        
+        /* Loading */
+        .loading-screen {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            inset: 0;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+        }
+        
+        .loading-spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid var(--bg-card);
+            border-top-color: var(--accent-cyan);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        .loading-text {
+            margin-top: 20px;
+            color: var(--text-secondary);
+        }
+        
+        .hidden { display: none !important; }
+        
+        /* Instructions overlay */
+        .instructions {
+            position: absolute;
+            bottom: 16px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
             background: rgba(0,0,0,0.7);
-            padding: 10px 15px;
-            border-radius: 20px;
-            font-size: 0.9em;
+            backdrop-filter: blur(10px);
+            border-radius: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+        
+        .instructions kbd {
+            padding: 2px 6px;
+            background: var(--bg-card);
+            border-radius: 4px;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>🎮 WebAssembly Game Engine</h1>
-        <p class="subtitle">High-performance 2D graphics with Rust + WebAssembly</p>
-        
-        <div class="canvas-container">
-            <canvas id="gameCanvas" width="800" height="600"></canvas>
-        </div>
-        
-        <div class="controls">
-            <div class="control-group">
-                <h3>🎯 Sprites</h3>
-                <button onclick="createRandomSprite()">Add Random Sprite</button>
-                <button onclick="createColorfulSprites()">Create Rainbow</button>
-                <button onclick="clearAllSprites()">Clear All</button>
-            </div>
-            
-            <div class="control-group">
-                <h3>🎨 Colors</h3>
-                <button onclick="randomizeColors()">Randomize Colors</button>
-                <button onclick="setTheme('red')">Red Theme</button>
-                <button onclick="setTheme('blue')">Blue Theme</button>
-                <button onclick="setTheme('green')">Green Theme</button>
-            </div>
-            
-            <div class="control-group">
-                <h3>⚡ Animation</h3>
-                <button onclick="startAnimation()">Start Animation</button>
-                <button onclick="stopAnimation()">Stop Animation</button>
-                <button onclick="toggleBouncing()">Toggle Bouncing</button>
-            </div>
-        </div>
-        
-        <div class="info">
-            <h3>🎮 Controls</h3>
-            <p><strong>Mouse:</strong> Click anywhere on the canvas to create a sprite</p>
-            <p><strong>WASD:</strong> Move sprites around (when animation is off)</p>
-            <p><strong>Space:</strong> Add a sprite at mouse position</p>
-            <p><strong>Features:</strong> Real-time rendering, physics simulation, collision detection, audio support</p>
-        </div>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loading">
+        <div class="loading-spinner"></div>
+        <div class="loading-text">Loading Engine...</div>
     </div>
     
-    <div class="status" id="status">Loading...</div>
-    
-    <div class="loading" id="loading">
-        <p>🔄 Loading WebAssembly Game Engine...</p>
-        <p><small>This may take a moment on first load</small></p>
+    <div class="app">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="logo">
+                    <div class="logo-icon">⚡</div>
+                    <span>Engine Playground</span>
+                </div>
+                <a href="../index.html" class="back-link">← Back to Home</a>
+            </div>
+            
+            <div class="demo-tabs">
+                <h3>Demo Modes</h3>
+                <button class="tab-btn active" data-mode="particles">
+                    <span class="tab-icon particles">🔥</span>
+                    <span>Particle System</span>
+                </button>
+                <button class="tab-btn" data-mode="physics">
+                    <span class="tab-icon physics">⚛️</span>
+                    <span>Physics Sandbox</span>
+                </button>
+                <button class="tab-btn" data-mode="collision">
+                    <span class="tab-icon collision">💥</span>
+                    <span>Collision Demo</span>
+                </button>
+                <button class="tab-btn" data-mode="benchmark">
+                    <span class="tab-icon benchmark">📊</span>
+                    <span>Performance Test</span>
+                </button>
+            </div>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main">
+            <header class="header">
+                <div>
+                    <h1 class="demo-title" id="demoTitle">Particle System</h1>
+                    <p class="demo-desc" id="demoDesc">Create stunning particle effects with real-time physics</p>
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value fps" id="fpsValue">60</div>
+                        <div class="stat-label">FPS</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value objects" id="objectCount">0</div>
+                        <div class="stat-label">Objects</div>
+                    </div>
+                </div>
+            </header>
+            
+            <div class="canvas-area">
+                <div class="canvas-wrapper">
+                    <canvas id="gameCanvas"></canvas>
+                    <div class="canvas-overlay">
+                        <span class="overlay-badge" id="engineBadge">⚡ JavaScript</span>
+                    </div>
+                    <div class="instructions" id="instructions">
+                        <kbd>Click</kbd> to spawn · <kbd>Hold</kbd> for continuous · <kbd>Space</kbd> burst
+                    </div>
+                </div>
+                
+                <!-- Controls Panel -->
+                <div class="controls-panel">
+                    <!-- Particles Controls -->
+                    <div id="particlesControls">
+                        <div class="control-section">
+                            <h4>Effect Presets</h4>
+                            <div class="preset-grid">
+                                <div class="preset-btn active" data-preset="fire">
+                                    <div class="preset-icon">🔥</div>
+                                    <div class="preset-name">Fire</div>
+                                </div>
+                                <div class="preset-btn" data-preset="snow">
+                                    <div class="preset-icon">❄️</div>
+                                    <div class="preset-name">Snow</div>
+                                </div>
+                                <div class="preset-btn" data-preset="rain">
+                                    <div class="preset-icon">🌧️</div>
+                                    <div class="preset-name">Rain</div>
+                                </div>
+                                <div class="preset-btn" data-preset="sparks">
+                                    <div class="preset-icon">✨</div>
+                                    <div class="preset-name">Sparks</div>
+                                </div>
+                                <div class="preset-btn" data-preset="smoke">
+                                    <div class="preset-icon">💨</div>
+                                    <div class="preset-name">Smoke</div>
+                                </div>
+                                <div class="preset-btn" data-preset="confetti">
+                                    <div class="preset-icon">🎉</div>
+                                    <div class="preset-name">Confetti</div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Parameters</h4>
+                            <div class="control-row">
+                                <span class="control-label">Spawn Rate</span>
+                                <span class="control-value" id="spawnRateVal">50</span>
+                            </div>
+                            <input type="range" id="spawnRate" min="1" max="200" value="50">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Particle Size</span>
+                                <span class="control-value" id="particleSizeVal">8</span>
+                            </div>
+                            <input type="range" id="particleSize" min="2" max="30" value="8">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Lifetime</span>
+                                <span class="control-value" id="lifetimeVal">2.0s</span>
+                            </div>
+                            <input type="range" id="lifetime" min="0.5" max="5" step="0.1" value="2">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Gravity</span>
+                                <span class="control-value" id="gravityVal">0</span>
+                            </div>
+                            <input type="range" id="gravity" min="-500" max="500" value="0">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Spread</span>
+                                <span class="control-value" id="spreadVal">360°</span>
+                            </div>
+                            <input type="range" id="spread" min="10" max="360" value="360">
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Actions</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" id="burstBtn">💥 Burst</button>
+                                <button class="btn btn-danger" id="clearBtn">🗑️ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Physics Controls -->
+                    <div id="physicsControls" class="hidden">
+                        <div class="control-section">
+                            <h4>Simulation</h4>
+                            <div class="control-row">
+                                <span class="control-label">Gravity</span>
+                                <span class="control-value" id="physGravityVal">980</span>
+                            </div>
+                            <input type="range" id="physGravity" min="0" max="2000" value="980">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Bounce</span>
+                                <span class="control-value" id="bounceVal">0.8</span>
+                            </div>
+                            <input type="range" id="bounce" min="0" max="1" step="0.05" value="0.8">
+                            
+                            <div class="control-row">
+                                <span class="control-label">Friction</span>
+                                <span class="control-value" id="frictionVal">0.99</span>
+                            </div>
+                            <input type="range" id="friction" min="0.9" max="1" step="0.005" value="0.99">
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Spawn Objects</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" data-spawn="ball">🔴 Ball</button>
+                                <button class="btn btn-secondary" data-spawn="box">🟦 Box</button>
+                            </div>
+                            <div class="btn-group" style="margin-top:8px">
+                                <button class="btn btn-primary" id="spawnManyBtn">+50 Objects</button>
+                            </div>
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Actions</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary" id="shakeBtn">🌪️ Shake</button>
+                                <button class="btn btn-danger" id="physClearBtn">🗑️ Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Collision Controls -->
+                    <div id="collisionControls" class="hidden">
+                        <div class="control-section">
+                            <h4>Visualization</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-secondary active" id="showBoxes">Show AABB</button>
+                                <button class="btn btn-secondary" id="showVelocity">Velocity</button>
+                            </div>
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Speed</h4>
+                            <div class="control-row">
+                                <span class="control-label">Object Speed</span>
+                                <span class="control-value" id="speedVal">200</span>
+                            </div>
+                            <input type="range" id="objSpeed" min="50" max="500" value="200">
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Actions</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" id="addColliderBtn">+ Add Object</button>
+                            </div>
+                            <div class="btn-group" style="margin-top:8px">
+                                <button class="btn btn-danger" id="collClearBtn">🗑️ Reset</button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Benchmark Controls -->
+                    <div id="benchmarkControls" class="hidden">
+                        <div class="control-section">
+                            <h4>Stress Test</h4>
+                            <div class="control-row">
+                                <span class="control-label">Target Objects</span>
+                                <span class="control-value" id="targetVal">1000</span>
+                            </div>
+                            <input type="range" id="targetObjects" min="100" max="10000" step="100" value="1000">
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Run Test</h4>
+                            <div class="btn-group">
+                                <button class="btn btn-primary" id="runBenchBtn">▶️ Start</button>
+                                <button class="btn btn-danger" id="stopBenchBtn">⏹️ Stop</button>
+                            </div>
+                        </div>
+                        
+                        <div class="control-section">
+                            <h4>Results</h4>
+                            <div class="control-row">
+                                <span class="control-label">Avg FPS</span>
+                                <span class="control-value" id="avgFps">--</span>
+                            </div>
+                            <div class="control-row">
+                                <span class="control-label">Min FPS</span>
+                                <span class="control-value" id="minFps">--</span>
+                            </div>
+                            <div class="control-row">
+                                <span class="control-label">Max Objects</span>
+                                <span class="control-value" id="maxObjects">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <script type="module">
-        import { GameEngine } from '../js/game-engine.js';
+    <script>
+        // ============================================
+        // ENGINE PLAYGROUND - Full Implementation
+        // ============================================
         
-        let engine;
-        let sprites = [];
-        let isAnimating = false;
-        let isBouncing = false;
-        let animationId = null;
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
         
-        // Initialize engine
-        async function init() {
-            try {
-                engine = new GameEngine('gameCanvas');
-                const success = await engine.init();
-                
-                if (success) {
-                    engine.start();
-                    document.getElementById('loading').style.display = 'none';
-                    
-                    // Show which engine is running
-                    const engineType = engine.useWasm ? 'WebAssembly' : 'JavaScript';
-                    const icon = engine.useWasm ? '🦀' : '⚡';
-                    document.getElementById('status').textContent = `${icon} ${engineType} Engine Ready`;
-                    
-                    // Create initial sprites
-                    createInitialSprites();
-                    setupGameLoop();
-                } else {
-                    throw new Error('Failed to initialize engine');
-                }
-            } catch (error) {
-                console.error('Initialization error:', error);
-                document.getElementById('loading').innerHTML = `
-                    <p>❌ Failed to load engine</p>
-                    <p><small>${error.message}</small></p>
-                    <p><small>Please ensure your browser supports WebAssembly</small></p>
-                `;
-                document.getElementById('status').textContent = '❌ Load Failed';
+        // State
+        let currentMode = 'particles';
+        let particles = [];
+        let physicsObjects = [];
+        let colliders = [];
+        let mouseX = 0, mouseY = 0;
+        let mouseDown = false;
+        let lastTime = performance.now();
+        let fps = 60;
+        let fpsHistory = [];
+        
+        // Particle Settings
+        const particleSettings = {
+            spawnRate: 50,
+            size: 8,
+            lifetime: 2,
+            gravity: 0,
+            spread: 360,
+            colors: ['#ff6b35', '#ff8c42', '#ffd166', '#ffee88'],
+            preset: 'fire'
+        };
+        
+        // Physics Settings
+        const physicsSettings = {
+            gravity: 980,
+            bounce: 0.8,
+            friction: 0.99
+        };
+        
+        // Collision Settings
+        const collisionSettings = {
+            speed: 200,
+            showAABB: true,
+            showVelocity: false
+        };
+        
+        // Benchmark State
+        let benchmarkRunning = false;
+        let benchmarkStats = { fps: [], minFps: Infinity, maxObjects: 0 };
+        
+        // ============================================
+        // PRESETS
+        // ============================================
+        const PRESETS = {
+            fire: {
+                colors: ['#ff6b35', '#ff8c42', '#ffd166', '#ffee88'],
+                gravity: -150,
+                lifetime: 1.5,
+                size: 10,
+                spread: 60,
+                spawnRate: 80
+            },
+            snow: {
+                colors: ['#ffffff', '#e8f4f8', '#d4e5ed', '#b8d4e3'],
+                gravity: 50,
+                lifetime: 4,
+                size: 4,
+                spread: 30,
+                spawnRate: 40
+            },
+            rain: {
+                colors: ['#4a90d9', '#6ba3e0', '#89b8e8', '#a8cef0'],
+                gravity: 800,
+                lifetime: 1,
+                size: 3,
+                spread: 10,
+                spawnRate: 150
+            },
+            sparks: {
+                colors: ['#ffd700', '#ffae00', '#ff8c00', '#ffffff'],
+                gravity: 200,
+                lifetime: 0.8,
+                size: 3,
+                spread: 360,
+                spawnRate: 100
+            },
+            smoke: {
+                colors: ['#555555', '#666666', '#777777', '#888888'],
+                gravity: -80,
+                lifetime: 3,
+                size: 20,
+                spread: 45,
+                spawnRate: 20
+            },
+            confetti: {
+                colors: ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#f38181', '#aa96da'],
+                gravity: 150,
+                lifetime: 3,
+                size: 8,
+                spread: 120,
+                spawnRate: 60
             }
+        };
+        
+        // ============================================
+        // CANVAS SETUP
+        // ============================================
+        function resizeCanvas() {
+            const wrapper = canvas.parentElement;
+            canvas.width = wrapper.clientWidth;
+            canvas.height = wrapper.clientHeight;
         }
         
-        function createInitialSprites() {
-            // Create some initial sprites for demonstration
-            for (let i = 0; i < 5; i++) {
-                createRandomSprite();
-            }
-        }
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
         
-        function setupGameLoop() {
-            function gameLoop() {
-                if (isAnimating) {
-                    updateSprites();
-                }
-                animationId = requestAnimationFrame(gameLoop);
-            }
-            gameLoop();
-        }
-        
-        function updateSprites() {
-            const canvas = engine.getCanvasSize();
-            const time = performance.now() * 0.001;
-            
-            sprites.forEach((sprite, index) => {
-                if (isBouncing) {
-                    // Bouncing animation
-                    const speed = 100 + index * 20;
-                    const x = Math.sin(time + index) * (canvas.width * 0.3) + canvas.width * 0.5;
-                    const y = Math.cos(time * 1.5 + index) * (canvas.height * 0.3) + canvas.height * 0.5;
-                    engine.moveSprite(sprite.id, x, y);
-                } else {
-                    // Circular motion
-                    const radius = 150 + index * 30;
-                    const angle = time + (index * Math.PI / 3);
-                    const x = Math.cos(angle) * radius + canvas.width * 0.5;
-                    const y = Math.sin(angle) * radius + canvas.height * 0.5;
-                    engine.moveSprite(sprite.id, x, y);
-                }
-                
-                // Color animation
-                const hue = (time + index) % (Math.PI * 2);
-                const color = hslToRgb(hue, 0.7, 0.6);
-                engine.setSpriteColor(sprite.id, color);
-            });
-        }
-        
-        // Utility functions for the global scope
-        window.createRandomSprite = function() {
-            const canvas = engine.getCanvasSize();
-            const sprite = engine.createSprite({
-                x: Math.random() * (canvas.width - 50),
-                y: Math.random() * (canvas.height - 50),
-                width: 30 + Math.random() * 40,
-                height: 30 + Math.random() * 40,
-                color: GameEngine.Color.random()
-            });
-            sprites.push(sprite);
-            document.getElementById('status').textContent = `Sprites: ${sprites.length}`;
-        };
-        
-        window.createColorfulSprites = function() {
-            const colors = [
-                GameEngine.Color.RED,
-                GameEngine.Color.GREEN,
-                GameEngine.Color.BLUE,
-                GameEngine.Color.YELLOW,
-                GameEngine.Color.MAGENTA,
-                GameEngine.Color.CYAN
-            ];
-            
-            const canvas = engine.getCanvasSize();
-            colors.forEach((color, i) => {
-                const sprite = engine.createSprite({
-                    x: (i + 1) * (canvas.width / (colors.length + 1)) - 25,
-                    y: canvas.height * 0.5 - 25,
-                    width: 50,
-                    height: 50,
-                    color: color
-                });
-                sprites.push(sprite);
-            });
-            document.getElementById('status').textContent = `Sprites: ${sprites.length}`;
-        };
-        
-        window.clearAllSprites = function() {
-            sprites = [];
-            location.reload(); // Simple way to clear - in real implementation we'd have a proper clear method
-        };
-        
-        window.randomizeColors = function() {
-            sprites.forEach(sprite => {
-                engine.setSpriteColor(sprite.id, GameEngine.Color.random());
-            });
-        };
-        
-        window.setTheme = function(theme) {
-            const themeColors = {
-                red: [GameEngine.Color.RED, {r: 0.8, g: 0.2, b: 0.2, a: 1.0}, {r: 1.0, g: 0.4, b: 0.4, a: 1.0}],
-                blue: [GameEngine.Color.BLUE, {r: 0.2, g: 0.4, b: 0.8, a: 1.0}, {r: 0.4, g: 0.6, b: 1.0, a: 1.0}],
-                green: [GameEngine.Color.GREEN, {r: 0.2, g: 0.8, b: 0.2, a: 1.0}, {r: 0.4, g: 1.0, b: 0.4, a: 1.0}]
-            };
-            
-            const colors = themeColors[theme] || [GameEngine.Color.WHITE];
-            sprites.forEach((sprite, i) => {
-                const color = colors[i % colors.length];
-                engine.setSpriteColor(sprite.id, color);
-            });
-        };
-        
-        window.startAnimation = function() {
-            isAnimating = true;
-            document.getElementById('status').textContent = '🎬 Animating...';
-        };
-        
-        window.stopAnimation = function() {
-            isAnimating = false;
-            document.getElementById('status').textContent = '⏸️ Animation Stopped';
-        };
-        
-        window.toggleBouncing = function() {
-            isBouncing = !isBouncing;
-            document.getElementById('status').textContent = isBouncing ? '🏀 Bouncing Mode' : '🌀 Circular Mode';
-        };
-        
-        // Utility function to convert HSL to RGB
-        function hslToRgb(h, s, l) {
-            const c = (1 - Math.abs(2 * l - 1)) * s;
-            const x = c * (1 - Math.abs((h / (Math.PI / 3)) % 2 - 1));
-            const m = l - c / 2;
-            
-            let r, g, b;
-            if (h < Math.PI / 3) {
-                [r, g, b] = [c, x, 0];
-            } else if (h < 2 * Math.PI / 3) {
-                [r, g, b] = [x, c, 0];
-            } else if (h < Math.PI) {
-                [r, g, b] = [0, c, x];
-            } else if (h < 4 * Math.PI / 3) {
-                [r, g, b] = [0, x, c];
-            } else if (h < 5 * Math.PI / 3) {
-                [r, g, b] = [x, 0, c];
-            } else {
-                [r, g, b] = [c, 0, x];
-            }
+        // ============================================
+        // PARTICLE SYSTEM
+        // ============================================
+        function createParticle(x, y, preset = particleSettings) {
+            const angle = (Math.random() - 0.5) * (preset.spread * Math.PI / 180);
+            const speed = 100 + Math.random() * 150;
+            const color = preset.colors[Math.floor(Math.random() * preset.colors.length)];
             
             return {
-                r: r + m,
-                g: g + m,
-                b: b + m,
-                a: 1.0
+                x, y,
+                vx: Math.sin(angle) * speed,
+                vy: -Math.cos(angle) * speed - 50,
+                size: preset.size * (0.5 + Math.random() * 0.5),
+                life: preset.lifetime,
+                maxLife: preset.lifetime,
+                color,
+                rotation: Math.random() * Math.PI * 2,
+                rotationSpeed: (Math.random() - 0.5) * 5
             };
         }
         
-        // Start the engine when page loads
-        init();
+        function updateParticles(dt) {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.vy += particleSettings.gravity * dt;
+                p.x += p.vx * dt;
+                p.y += p.vy * dt;
+                p.life -= dt;
+                p.rotation += p.rotationSpeed * dt;
+                
+                if (p.life <= 0) {
+                    particles.splice(i, 1);
+                }
+            }
+        }
+        
+        function drawParticles() {
+            particles.forEach(p => {
+                const alpha = Math.max(0, p.life / p.maxLife);
+                const size = p.size * (0.5 + alpha * 0.5);
+                
+                ctx.save();
+                ctx.translate(p.x, p.y);
+                ctx.rotate(p.rotation);
+                ctx.globalAlpha = alpha;
+                
+                // Glow effect
+                const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 2);
+                gradient.addColorStop(0, p.color);
+                gradient.addColorStop(0.5, p.color + '88');
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(0, 0, size * 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Core
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, size, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+        
+        // ============================================
+        // PHYSICS SYSTEM
+        // ============================================
+        function createPhysicsObject(x, y, type = 'ball') {
+            const size = 20 + Math.random() * 30;
+            const colors = ['#ff6b6b', '#4ecdc4', '#ffe66d', '#95e1d3', '#a855f7', '#00f0ff'];
+            
+            return {
+                x, y,
+                vx: (Math.random() - 0.5) * 200,
+                vy: (Math.random() - 0.5) * 200,
+                width: size,
+                height: type === 'box' ? size : size,
+                type,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                rotation: 0,
+                rotationSpeed: (Math.random() - 0.5) * 3
+            };
+        }
+        
+        function updatePhysics(dt) {
+            physicsObjects.forEach(obj => {
+                // Apply gravity
+                obj.vy += physicsSettings.gravity * dt;
+                
+                // Apply friction
+                obj.vx *= physicsSettings.friction;
+                obj.vy *= physicsSettings.friction;
+                
+                // Update position
+                obj.x += obj.vx * dt;
+                obj.y += obj.vy * dt;
+                obj.rotation += obj.rotationSpeed * dt;
+                
+                // Bounce off walls
+                if (obj.x < obj.width / 2) {
+                    obj.x = obj.width / 2;
+                    obj.vx *= -physicsSettings.bounce;
+                }
+                if (obj.x > canvas.width - obj.width / 2) {
+                    obj.x = canvas.width - obj.width / 2;
+                    obj.vx *= -physicsSettings.bounce;
+                }
+                if (obj.y < obj.height / 2) {
+                    obj.y = obj.height / 2;
+                    obj.vy *= -physicsSettings.bounce;
+                }
+                if (obj.y > canvas.height - obj.height / 2) {
+                    obj.y = canvas.height - obj.height / 2;
+                    obj.vy *= -physicsSettings.bounce;
+                    obj.rotationSpeed *= 0.95;
+                }
+            });
+        }
+        
+        function drawPhysics() {
+            physicsObjects.forEach(obj => {
+                ctx.save();
+                ctx.translate(obj.x, obj.y);
+                ctx.rotate(obj.rotation);
+                
+                // Shadow
+                ctx.shadowColor = obj.color;
+                ctx.shadowBlur = 15;
+                
+                ctx.fillStyle = obj.color;
+                
+                if (obj.type === 'ball') {
+                    ctx.beginPath();
+                    ctx.arc(0, 0, obj.width / 2, 0, Math.PI * 2);
+                    ctx.fill();
+                    
+                    // Highlight
+                    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+                    ctx.beginPath();
+                    ctx.arc(-obj.width * 0.15, -obj.height * 0.15, obj.width * 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(-obj.width / 2, -obj.height / 2, obj.width, obj.height);
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        // ============================================
+        // COLLISION SYSTEM
+        // ============================================
+        function createCollider(x, y) {
+            const size = 40 + Math.random() * 30;
+            const angle = Math.random() * Math.PI * 2;
+            const speed = collisionSettings.speed;
+            const colors = ['#ff6b6b', '#4ecdc4', '#a855f7', '#00f0ff', '#22c55e', '#f97316'];
+            
+            return {
+                x, y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                width: size,
+                height: size,
+                color: colors[Math.floor(Math.random() * colors.length)],
+                colliding: false
+            };
+        }
+        
+        function checkAABB(a, b) {
+            return a.x < b.x + b.width &&
+                   a.x + a.width > b.x &&
+                   a.y < b.y + b.height &&
+                   a.y + a.height > b.y;
+        }
+        
+        function updateCollision(dt) {
+            // Reset collision state
+            colliders.forEach(c => c.colliding = false);
+            
+            // Check collisions
+            for (let i = 0; i < colliders.length; i++) {
+                for (let j = i + 1; j < colliders.length; j++) {
+                    const a = colliders[i];
+                    const b = colliders[j];
+                    
+                    const aBox = { x: a.x - a.width/2, y: a.y - a.height/2, width: a.width, height: a.height };
+                    const bBox = { x: b.x - b.width/2, y: b.y - b.height/2, width: b.width, height: b.height };
+                    
+                    if (checkAABB(aBox, bBox)) {
+                        a.colliding = true;
+                        b.colliding = true;
+                        
+                        // Simple collision response
+                        const dx = b.x - a.x;
+                        const dy = b.y - a.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+                        
+                        const nx = dx / dist;
+                        const ny = dy / dist;
+                        
+                        const tempVx = a.vx;
+                        const tempVy = a.vy;
+                        a.vx = b.vx * 0.8;
+                        a.vy = b.vy * 0.8;
+                        b.vx = tempVx * 0.8;
+                        b.vy = tempVy * 0.8;
+                        
+                        // Separate
+                        const overlap = (a.width + b.width) / 2 - dist + 5;
+                        a.x -= nx * overlap / 2;
+                        a.y -= ny * overlap / 2;
+                        b.x += nx * overlap / 2;
+                        b.y += ny * overlap / 2;
+                    }
+                }
+            }
+            
+            // Update positions
+            colliders.forEach(c => {
+                c.x += c.vx * dt;
+                c.y += c.vy * dt;
+                
+                // Bounce off walls
+                if (c.x < c.width/2) { c.x = c.width/2; c.vx *= -1; }
+                if (c.x > canvas.width - c.width/2) { c.x = canvas.width - c.width/2; c.vx *= -1; }
+                if (c.y < c.height/2) { c.y = c.height/2; c.vy *= -1; }
+                if (c.y > canvas.height - c.height/2) { c.y = canvas.height - c.height/2; c.vy *= -1; }
+            });
+        }
+        
+        function drawCollision() {
+            colliders.forEach(c => {
+                ctx.save();
+                
+                // AABB visualization
+                if (collisionSettings.showAABB) {
+                    ctx.strokeStyle = c.colliding ? '#ff0000' : '#00f0ff';
+                    ctx.lineWidth = 2;
+                    ctx.setLineDash([5, 5]);
+                    ctx.strokeRect(c.x - c.width/2, c.y - c.height/2, c.width, c.height);
+                    ctx.setLineDash([]);
+                }
+                
+                // Object
+                ctx.fillStyle = c.colliding ? '#ff6b6b' : c.color;
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = c.colliding ? 25 : 10;
+                
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, c.width / 2 - 5, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Velocity vector
+                if (collisionSettings.showVelocity) {
+                    ctx.strokeStyle = '#22c55e';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(c.x, c.y);
+                    ctx.lineTo(c.x + c.vx * 0.3, c.y + c.vy * 0.3);
+                    ctx.stroke();
+                    
+                    // Arrow head
+                    const angle = Math.atan2(c.vy, c.vx);
+                    ctx.beginPath();
+                    ctx.moveTo(c.x + c.vx * 0.3, c.y + c.vy * 0.3);
+                    ctx.lineTo(c.x + c.vx * 0.3 - 10 * Math.cos(angle - 0.5), c.y + c.vy * 0.3 - 10 * Math.sin(angle - 0.5));
+                    ctx.moveTo(c.x + c.vx * 0.3, c.y + c.vy * 0.3);
+                    ctx.lineTo(c.x + c.vx * 0.3 - 10 * Math.cos(angle + 0.5), c.y + c.vy * 0.3 - 10 * Math.sin(angle + 0.5));
+                    ctx.stroke();
+                }
+                
+                ctx.restore();
+            });
+        }
+        
+        // ============================================
+        // BENCHMARK
+        // ============================================
+        function updateBenchmark(dt) {
+            if (!benchmarkRunning) return;
+            
+            const target = parseInt(document.getElementById('targetObjects').value);
+            
+            // Add objects to reach target
+            while (particles.length < target) {
+                particles.push(createParticle(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height,
+                    PRESETS.sparks
+                ));
+            }
+            
+            // Update stats
+            benchmarkStats.fps.push(fps);
+            if (benchmarkStats.fps.length > 60) benchmarkStats.fps.shift();
+            benchmarkStats.minFps = Math.min(benchmarkStats.minFps, fps);
+            benchmarkStats.maxObjects = Math.max(benchmarkStats.maxObjects, particles.length);
+            
+            const avgFps = benchmarkStats.fps.reduce((a, b) => a + b, 0) / benchmarkStats.fps.length;
+            document.getElementById('avgFps').textContent = Math.round(avgFps);
+            document.getElementById('minFps').textContent = Math.round(benchmarkStats.minFps);
+            document.getElementById('maxObjects').textContent = benchmarkStats.maxObjects;
+            
+            // Update particles with minimal settings
+            updateParticles(dt);
+        }
+        
+        // ============================================
+        // MAIN LOOP
+        // ============================================
+        function gameLoop(currentTime) {
+            const dt = Math.min((currentTime - lastTime) / 1000, 0.1);
+            lastTime = currentTime;
+            
+            // Calculate FPS
+            fps = 1 / dt;
+            fpsHistory.push(fps);
+            if (fpsHistory.length > 30) fpsHistory.shift();
+            const avgFps = fpsHistory.reduce((a, b) => a + b, 0) / fpsHistory.length;
+            document.getElementById('fpsValue').textContent = Math.round(avgFps);
+            
+            // Clear
+            ctx.fillStyle = '#0a0a0f';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw grid
+            ctx.strokeStyle = 'rgba(255,255,255,0.03)';
+            ctx.lineWidth = 1;
+            for (let x = 0; x < canvas.width; x += 50) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            for (let y = 0; y < canvas.height; y += 50) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Spawn particles on mouse hold
+            if (mouseDown && currentMode === 'particles') {
+                const count = Math.ceil(particleSettings.spawnRate * dt);
+                for (let i = 0; i < count; i++) {
+                    particles.push(createParticle(mouseX, mouseY, particleSettings));
+                }
+            }
+            
+            // Update & Draw based on mode
+            switch (currentMode) {
+                case 'particles':
+                    updateParticles(dt);
+                    drawParticles();
+                    document.getElementById('objectCount').textContent = particles.length;
+                    break;
+                case 'physics':
+                    updatePhysics(dt);
+                    drawPhysics();
+                    document.getElementById('objectCount').textContent = physicsObjects.length;
+                    break;
+                case 'collision':
+                    updateCollision(dt);
+                    drawCollision();
+                    document.getElementById('objectCount').textContent = colliders.length;
+                    break;
+                case 'benchmark':
+                    updateBenchmark(dt);
+                    drawParticles();
+                    document.getElementById('objectCount').textContent = particles.length;
+                    break;
+            }
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        // ============================================
+        // EVENT HANDLERS
+        // ============================================
+        
+        // Mouse events
+        canvas.addEventListener('mousedown', (e) => {
+            mouseDown = true;
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            
+            if (currentMode === 'physics') {
+                physicsObjects.push(createPhysicsObject(mouseX, mouseY, 'ball'));
+            } else if (currentMode === 'collision') {
+                colliders.push(createCollider(mouseX, mouseY));
+            }
+        });
+        
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+        
+        canvas.addEventListener('mouseup', () => mouseDown = false);
+        canvas.addEventListener('mouseleave', () => mouseDown = false);
+        
+        // Keyboard
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                for (let i = 0; i < 50; i++) {
+                    if (currentMode === 'particles') {
+                        particles.push(createParticle(mouseX, mouseY, particleSettings));
+                    }
+                }
+            }
+        });
+        
+        // Tab switching
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                currentMode = btn.dataset.mode;
+                
+                // Update title
+                const titles = {
+                    particles: ['Particle System', 'Create stunning particle effects with real-time physics'],
+                    physics: ['Physics Sandbox', 'Experiment with gravity, bounce, and friction'],
+                    collision: ['Collision Detection', 'Visualize AABB collision detection and response'],
+                    benchmark: ['Performance Test', 'Stress test the engine with thousands of objects']
+                };
+                document.getElementById('demoTitle').textContent = titles[currentMode][0];
+                document.getElementById('demoDesc').textContent = titles[currentMode][1];
+                
+                // Update instructions
+                const instructions = {
+                    particles: '<kbd>Click</kbd> to spawn · <kbd>Hold</kbd> for continuous · <kbd>Space</kbd> burst',
+                    physics: '<kbd>Click</kbd> to spawn objects · Watch them bounce and collide',
+                    collision: '<kbd>Click</kbd> to add objects · Watch collision detection in action',
+                    benchmark: 'Click <kbd>Start</kbd> to begin stress test'
+                };
+                document.getElementById('instructions').innerHTML = instructions[currentMode];
+                
+                // Show/hide controls
+                document.getElementById('particlesControls').classList.toggle('hidden', currentMode !== 'particles');
+                document.getElementById('physicsControls').classList.toggle('hidden', currentMode !== 'physics');
+                document.getElementById('collisionControls').classList.toggle('hidden', currentMode !== 'collision');
+                document.getElementById('benchmarkControls').classList.toggle('hidden', currentMode !== 'benchmark');
+                
+                // Clear objects when switching
+                particles = [];
+                physicsObjects = [];
+                colliders = [];
+                benchmarkRunning = false;
+            });
+        });
+        
+        // Presets
+        document.querySelectorAll('.preset-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                
+                const preset = PRESETS[btn.dataset.preset];
+                if (preset) {
+                    particleSettings.colors = preset.colors;
+                    particleSettings.gravity = preset.gravity;
+                    particleSettings.lifetime = preset.lifetime;
+                    particleSettings.size = preset.size;
+                    particleSettings.spread = preset.spread;
+                    particleSettings.spawnRate = preset.spawnRate;
+                    
+                    // Update sliders
+                    document.getElementById('spawnRate').value = preset.spawnRate;
+                    document.getElementById('spawnRateVal').textContent = preset.spawnRate;
+                    document.getElementById('particleSize').value = preset.size;
+                    document.getElementById('particleSizeVal').textContent = preset.size;
+                    document.getElementById('lifetime').value = preset.lifetime;
+                    document.getElementById('lifetimeVal').textContent = preset.lifetime + 's';
+                    document.getElementById('gravity').value = preset.gravity;
+                    document.getElementById('gravityVal').textContent = preset.gravity;
+                    document.getElementById('spread').value = preset.spread;
+                    document.getElementById('spreadVal').textContent = preset.spread + '°';
+                }
+            });
+        });
+        
+        // Sliders - Particles
+        document.getElementById('spawnRate').addEventListener('input', (e) => {
+            particleSettings.spawnRate = parseInt(e.target.value);
+            document.getElementById('spawnRateVal').textContent = e.target.value;
+        });
+        document.getElementById('particleSize').addEventListener('input', (e) => {
+            particleSettings.size = parseInt(e.target.value);
+            document.getElementById('particleSizeVal').textContent = e.target.value;
+        });
+        document.getElementById('lifetime').addEventListener('input', (e) => {
+            particleSettings.lifetime = parseFloat(e.target.value);
+            document.getElementById('lifetimeVal').textContent = e.target.value + 's';
+        });
+        document.getElementById('gravity').addEventListener('input', (e) => {
+            particleSettings.gravity = parseInt(e.target.value);
+            document.getElementById('gravityVal').textContent = e.target.value;
+        });
+        document.getElementById('spread').addEventListener('input', (e) => {
+            particleSettings.spread = parseInt(e.target.value);
+            document.getElementById('spreadVal').textContent = e.target.value + '°';
+        });
+        
+        // Buttons - Particles
+        document.getElementById('burstBtn').addEventListener('click', () => {
+            for (let i = 0; i < 100; i++) {
+                particles.push(createParticle(canvas.width / 2, canvas.height / 2, particleSettings));
+            }
+        });
+        document.getElementById('clearBtn').addEventListener('click', () => particles = []);
+        
+        // Sliders - Physics
+        document.getElementById('physGravity').addEventListener('input', (e) => {
+            physicsSettings.gravity = parseInt(e.target.value);
+            document.getElementById('physGravityVal').textContent = e.target.value;
+        });
+        document.getElementById('bounce').addEventListener('input', (e) => {
+            physicsSettings.bounce = parseFloat(e.target.value);
+            document.getElementById('bounceVal').textContent = e.target.value;
+        });
+        document.getElementById('friction').addEventListener('input', (e) => {
+            physicsSettings.friction = parseFloat(e.target.value);
+            document.getElementById('frictionVal').textContent = e.target.value;
+        });
+        
+        // Buttons - Physics
+        document.querySelectorAll('[data-spawn]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                physicsObjects.push(createPhysicsObject(
+                    canvas.width / 2 + (Math.random() - 0.5) * 200,
+                    100,
+                    btn.dataset.spawn
+                ));
+            });
+        });
+        document.getElementById('spawnManyBtn').addEventListener('click', () => {
+            for (let i = 0; i < 50; i++) {
+                physicsObjects.push(createPhysicsObject(
+                    Math.random() * canvas.width,
+                    Math.random() * canvas.height * 0.3,
+                    Math.random() > 0.5 ? 'ball' : 'box'
+                ));
+            }
+        });
+        document.getElementById('shakeBtn').addEventListener('click', () => {
+            physicsObjects.forEach(obj => {
+                obj.vx += (Math.random() - 0.5) * 500;
+                obj.vy += (Math.random() - 0.5) * 500;
+            });
+        });
+        document.getElementById('physClearBtn').addEventListener('click', () => physicsObjects = []);
+        
+        // Buttons - Collision
+        document.getElementById('showBoxes').addEventListener('click', (e) => {
+            collisionSettings.showAABB = !collisionSettings.showAABB;
+            e.target.classList.toggle('active', collisionSettings.showAABB);
+        });
+        document.getElementById('showVelocity').addEventListener('click', (e) => {
+            collisionSettings.showVelocity = !collisionSettings.showVelocity;
+            e.target.classList.toggle('active', collisionSettings.showVelocity);
+        });
+        document.getElementById('objSpeed').addEventListener('input', (e) => {
+            collisionSettings.speed = parseInt(e.target.value);
+            document.getElementById('speedVal').textContent = e.target.value;
+        });
+        document.getElementById('addColliderBtn').addEventListener('click', () => {
+            colliders.push(createCollider(
+                canvas.width / 2 + (Math.random() - 0.5) * 200,
+                canvas.height / 2 + (Math.random() - 0.5) * 200
+            ));
+        });
+        document.getElementById('collClearBtn').addEventListener('click', () => colliders = []);
+        
+        // Benchmark
+        document.getElementById('targetObjects').addEventListener('input', (e) => {
+            document.getElementById('targetVal').textContent = e.target.value;
+        });
+        document.getElementById('runBenchBtn').addEventListener('click', () => {
+            benchmarkRunning = true;
+            benchmarkStats = { fps: [], minFps: Infinity, maxObjects: 0 };
+            particles = [];
+        });
+        document.getElementById('stopBenchBtn').addEventListener('click', () => {
+            benchmarkRunning = false;
+        });
+        
+        // ============================================
+        // INIT
+        // ============================================
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('engineBadge').innerHTML = '⚡ Canvas 2D Engine';
+        document.getElementById('engineBadge').classList.add('js');
+        
+        // Start
+        requestAnimationFrame(gameLoop);
     </script>
 </body>
 </html>
